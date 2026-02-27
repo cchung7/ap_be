@@ -1,0 +1,61 @@
+import { withApiHandler } from "@/src/lib/withApiHandler";
+import { sendResponse } from "@/src/lib/sendResponse";
+import { prisma } from "@/src/lib/prisma";
+import { requireAuth } from "@/src/lib/auth";
+import { ApiError } from "@/src/lib/apiError";
+import { ActivityType } from "@prisma/client";
+
+export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
+  const { params } = ctx as { params: { id: string } };
+  const eventId = params.id;
+
+  const me = await requireAuth(["ADMIN", "MEMBER"]);
+
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) throw new ApiError(404, "Event not found");
+
+  if (event.capacity > 0 && event.totalRegistered >= event.capacity) {
+    throw new ApiError(400, "Event capacity is full");
+  }
+
+  const existing = await prisma.eventAttendance.findFirst({
+    where: { userId: me.id, eventId },
+  });
+  if (existing) {
+    throw new ApiError(400, "User already registered for this event");
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const attendance = await tx.eventAttendance.create({
+      data: {
+        userId: me.id,
+        eventId,
+        status: "REGISTERED",
+      },
+    });
+
+    await tx.event.update({
+      where: { id: eventId },
+      data: { totalRegistered: { increment: 1 } },
+    });
+
+    await tx.recentActivity.create({
+      data: {
+        activityType: ActivityType.USER_REGISTERED,
+        description: `${me.name ?? me.email} registered for event: ${event.title}`,
+        userId: me.id,
+        userName: me.name ?? me.email,
+        metadata: JSON.stringify({ eventId }),
+      },
+    });
+
+    return attendance;
+  });
+
+  return sendResponse({
+    statusCode: 200,
+    success: true,
+    message: "이벤트 참가 신청이 성공적으로 접수되었습니다",
+    data: result,
+  });
+}) as any;

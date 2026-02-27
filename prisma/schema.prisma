@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+}
+
+enum AttendanceStatus {
+  REGISTERED
+  CHECKED_IN
+  CANCELED
+}
+
+enum ActivityType {
+  GENERAL
+  EVENT_CREATED
+  EVENT_UPDATED
+  EVENT_DELETED
+  USER_REGISTERED
+  USER_CHECKED_IN
+  CHECKIN_CODE_ROTATED
+}
+
+model User {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  email        String     @unique
+  password     String     // bcrypt hash
+  role         UserRole   @default(MEMBER)
+  subRole      String?
+  status       UserStatus @default(ACTIVE)
+
+  pointsTotal  Int        @default(0)
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  attendances  EventAttendance[]
+
+  @@map("users")
+}
+
+model Event {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  title              String
+  date               DateTime
+  startTime          String
+  endTime            String
+  location           String
+  description        String?
+  capacity           Int      @default(0)
+  totalRegistered    Int      @default(0)
+
+  pointsValue        Int      @default(0)
+
+  checkInCodeHash    String?
+  checkInCodeExpires DateTime?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  attendances        EventAttendance[]
+
+  @@index([date])
+  @@map("events")
+}
+
+model EventAttendance {
+  id            String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String           @db.ObjectId
+  eventId       String           @db.ObjectId
+
+  status        AttendanceStatus @default(REGISTERED)
+  registeredAt  DateTime         @default(now())
+  checkedInAt   DateTime?
+  pointsAwarded Int              @default(0)
+
+  user          User             @relation(fields: [userId], references: [id])
+  event         Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([userId, eventId])
+  @@index([eventId, status])
+  @@index([userId, status])
+  @@map("event_attendances")
+}
+
+model RecentActivity {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  activityType ActivityType @default(GENERAL)
+  description  String
+  userId       String?      @db.ObjectId
+  userName     String?
+  metadata     String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([activityType, createdAt])
+  @@index([userId])
+  @@map("recent_activities")
+}
