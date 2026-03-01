@@ -25,7 +25,7 @@ export const GET = withApiHandler(async (_req?: any, ctx?: any) => {
   return sendResponse({
     statusCode: 200,
     success: true,
-    message: "이벤트 상세 정보를 성공적으로 불러왔습니다",
+    message: "Event details fetched successfully",
     data: { ...event, isRegistered },
   });
 }) as any;

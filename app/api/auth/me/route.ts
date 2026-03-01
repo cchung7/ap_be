@@ -5,6 +5,7 @@ import { prisma } from "@/src/lib/prisma";
 
 export const GET = withApiHandler(async () => {
   const tokenUser = await optionalAuth();
+
   if (!tokenUser) {
     return sendResponse({
       statusCode: 200,
@@ -16,7 +17,15 @@ export const GET = withApiHandler(async () => {
 
   const me = await prisma.user.findUnique({
     where: { id: tokenUser.id },
-    select: { id: true, email: true, role: true, name: true, subRole: true, status: true, pointsTotal: true },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      name: true,
+      subRole: true,
+      status: true,
+      pointsTotal: true,
+    },
   });
 
   return sendResponse({

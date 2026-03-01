@@ -1,5 +1,5 @@
-import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
+
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
@@ -15,13 +15,20 @@ export const POST = withApiHandler(async (req?: any) => {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, password: true, role: true, name: true, status: true },
+    select: {
+      id: true,
+      email: true,
+      password: true,
+      role: true,
+      name: true,
+      status: true,
+    },
   });
 
-  if (!user) throw new ApiError(404, "User not found!");
+  if (!user) throw new ApiError(404, "User not found");
 
   const ok = await verifyPassword(password, user.password);
-  if (!ok) throw new ApiError(400, "비밀번호가 올바르지 않습니다");
+  if (!ok) throw new ApiError(400, "Password is incorrect");
 
   if (user.status !== "ACTIVE") {
     throw new ApiError(403, "Account is not active");
@@ -34,18 +41,29 @@ export const POST = withApiHandler(async (req?: any) => {
     name: user.name,
   });
 
-  const jar = await cookies();
-  jar.set(process.env.COOKIE_NAME || "token", token, {
-    httpOnly: true,
-    secure: (process.env.COOKIE_SECURE || "false") === "true",
-    sameSite: (process.env.COOKIE_SAMESITE as any) || "lax",
-    path: "/",
-  });
-
-  return sendResponse({
+  // Build the JSON response using your existing helper
+  const payload = sendResponse({
     statusCode: 200,
     success: true,
-    message: "로그인이 성공적으로 완료되었습니다",
+    message: "Login successful",
     data: { token, role: user.role },
   });
+
+  // Set cookie on the response
+  const res = NextResponse.json(payload, { status: 200 });
+
+  const cookieName = process.env.COOKIE_NAME || "token";
+  const secure = (process.env.COOKIE_SECURE || "false") === "true";
+  const sameSite = (process.env.COOKIE_SAMESITE as "lax" | "strict" | "none") || "lax";
+
+  res.cookies.set(cookieName, token, {
+    httpOnly: true,
+    secure,
+    sameSite,
+    path: "/",
+    // optional but recommended:
+    // maxAge: 60 * 60 * 24 * 7, // 7 days
+  });
+
+  return res;
 }) as any;

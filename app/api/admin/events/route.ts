@@ -41,7 +41,7 @@ export const POST = withApiHandler(async (req?: any) => {
   return sendResponse({
     statusCode: 201,
     success: true,
-    message: "이벤트가 성공적으로 생성되었습니다",
+    message: "Event created successfully",
     data: created,
   });
 }) as any;

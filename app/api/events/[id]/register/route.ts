@@ -55,7 +55,7 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
   return sendResponse({
     statusCode: 200,
     success: true,
-    message: "이벤트 참가 신청이 성공적으로 접수되었습니다",
+    message: "Event registration successful",
     data: result,
   });
 }) as any;

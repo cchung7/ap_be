@@ -4,7 +4,7 @@ import { prisma } from "@/src/lib/prisma";
 import { optionalAuth } from "@/src/lib/auth";
 
 function getChicagoBoundariesUTC() {
-  // Minimal: use server local time; if you want full TZ correctness, we can add date-fns-tz later.
+  // Minimal: uses server local time. If you want full TZ correctness, add date-fns-tz later.
   const now = new Date();
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
@@ -21,7 +21,6 @@ export const GET = withApiHandler(async (req?: any) => {
   const status = url.searchParams.get("status") || ""; // UPCOMING | TODAY | PAST
   const page = Number(url.searchParams.get("page") || "1");
   const limit = Number(url.searchParams.get("limit") || "12");
-
   const skip = (page - 1) * limit;
 
   const and: any[] = [];
@@ -81,7 +80,7 @@ export const GET = withApiHandler(async (req?: any) => {
   return sendResponse({
     statusCode: 200,
     success: true,
-    message: "이벤트 목록을 성공적으로 불러왔습니다",
+    message: "Events fetched successfully",
     meta: { page, limit, total },
     data,
   });

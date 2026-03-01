@@ -76,7 +76,7 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
   return sendResponse({
     statusCode: 200,
     success: true,
-    message: "체크인이 완료되었습니다",
+    message: "Check-in successful",
     data: updated,
   });
 }) as any;

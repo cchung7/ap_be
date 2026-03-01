@@ -39,7 +39,7 @@ export const PATCH = withApiHandler(async (req?: any, ctx?: any) => {
   return sendResponse({
     statusCode: 200,
     success: true,
-    message: "이벤트 정보가 성공적으로 업데이트되었습니다",
+    message: "Event updated successfully",
     data: updated,
   });
 }) as any;
@@ -73,7 +73,7 @@ export const DELETE = withApiHandler(async (_req?: any, ctx?: any) => {
   return sendResponse({
     statusCode: 200,
     success: true,
-    message: "이벤트가 성공적으로 삭제되었습니다",
+    message: "Event deleted successfully",
     data: deleted,
   });
 }) as any;

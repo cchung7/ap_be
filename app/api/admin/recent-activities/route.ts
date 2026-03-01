@@ -24,7 +24,7 @@ export const GET = withApiHandler(async (req?: any) => {
   return sendResponse({
     statusCode: 200,
     success: true,
-    message: "최근 활동을 성공적으로 불러왔습니다",
+    message: "Recent activities fetched successfully",
     meta: { page, limit, total, totalPage: Math.ceil(total / limit) },
     data: items,
   });

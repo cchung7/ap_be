@@ -1,21 +1,29 @@
-import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 
 export const POST = withApiHandler(async () => {
-  const jar = await cookies();
-  jar.set(process.env.COOKIE_NAME || "token", "", {
+  const payload = sendResponse({
+    statusCode: 200,
+    success: true,
+    message: "Logout successful",
+    data: null,
+  });
+
+  const res = NextResponse.json(payload, { status: 200 });
+
+  const cookieName = process.env.COOKIE_NAME || "token";
+  const secure = (process.env.COOKIE_SECURE || "false") === "true";
+  const sameSite = (process.env.COOKIE_SAMESITE as "lax" | "strict" | "none") || "lax";
+
+  res.cookies.set(cookieName, "", {
     httpOnly: true,
-    secure: (process.env.COOKIE_SECURE || "false") === "true",
-    sameSite: (process.env.COOKIE_SAMESITE as any) || "lax",
+    secure,
+    sameSite,
     path: "/",
     maxAge: 0,
   });
 
-  return sendResponse({
-    statusCode: 200,
-    success: true,
-    message: "로그아웃이 성공적으로 완료되었습니다",
-    data: null,
-  });
-});
+  return res;
+}) as any;
