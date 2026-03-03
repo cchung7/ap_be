@@ -31,5 +31,5 @@ export async function requireAuth(
     throw new ApiError(403, "Forbidden!");
   }
 
-  return user;
+  return user;  
 }
