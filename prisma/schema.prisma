@@ -1,3 +1,4 @@
+// D:\ap_be\prisma\schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -35,21 +36,25 @@ enum ActivityType {
 }
 
 model User {
-  id           String     @id @default(auto()) @map("_id") @db.ObjectId
-  name         String
-  email        String     @unique
-  password     String     // bcrypt hash
-  role         UserRole   @default(MEMBER)
-  subRole      String?
-  status       UserStatus @default(ACTIVE)
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  email           String     @unique
+  password        String     // bcrypt hash
+  role            UserRole   @default(MEMBER)
+  subRole         String?
+  status          UserStatus @default(ACTIVE)
 
-  pointsTotal  Int        @default(0)
+  academicYear    String?
+  major           String?
+  profileImageUrl String?
 
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  pointsTotal     Int        @default(0)
 
-  attendances  EventAttendance[]
-  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  attendances     EventAttendance[]
+
   @@map("users")
 }
 

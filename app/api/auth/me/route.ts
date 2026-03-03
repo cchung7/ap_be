@@ -25,6 +25,10 @@ export const GET = withApiHandler(async () => {
       subRole: true,
       status: true,
       pointsTotal: true,
+
+      academicYear: true,
+      major: true,
+      profileImageUrl: true,
     },
   });
 

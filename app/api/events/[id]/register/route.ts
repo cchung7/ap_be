@@ -1,3 +1,4 @@
+// D:\ap_be\app\api\events\[id]\register\route.ts
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
@@ -10,6 +11,17 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
   const eventId = params.id;
 
   const me = await requireAuth(["ADMIN", "MEMBER"]);
+
+  // ✅ Enforce ACTIVE for event registration
+  const user = await prisma.user.findUnique({
+    where: { id: me.id },
+    select: { status: true, name: true, email: true },
+  });
+
+  if (!user) throw new ApiError(401, "Authorization Failed!");
+  if (user.status !== "ACTIVE") {
+    throw new ApiError(403, "Account pending approval");
+  }
 
   const event = await prisma.event.findUnique({ where: { id: eventId } });
   if (!event) throw new ApiError(404, "Event not found");
@@ -42,9 +54,9 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
     await tx.recentActivity.create({
       data: {
         activityType: ActivityType.USER_REGISTERED,
-        description: `${me.name ?? me.email} registered for event: ${event.title}`,
+        description: `${user.name ?? user.email} registered for event: ${event.title}`,
         userId: me.id,
-        userName: me.name ?? me.email,
+        userName: user.name ?? user.email,
         metadata: JSON.stringify({ eventId }),
       },
     });

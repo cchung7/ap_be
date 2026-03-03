@@ -6,8 +6,10 @@
     "build": "next build",
     "start": "next start -p 4000",
     "prisma:generate": "prisma generate",
+    "prisma:dbpush": "prisma db push",
     "prisma:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && prisma db push && next build"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",

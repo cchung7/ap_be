@@ -1,3 +1,4 @@
+// D:\ap_be\app\api\auth\login\route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 import { withApiHandler } from "@/src/lib/withApiHandler";
@@ -16,8 +17,10 @@ export const POST = withApiHandler(async (req?: any) => {
   const raw = await request.json();
   const { email, password } = loginSchema.parse(raw);
 
+  const normalizedEmail = email.trim().toLowerCase();
+
   const user = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
     select: {
       id: true,
       email: true,
@@ -33,8 +36,8 @@ export const POST = withApiHandler(async (req?: any) => {
   const ok = await verifyPassword(password, user.password);
   if (!ok) throw new ApiError(400, "Password is incorrect");
 
-  if (user.status !== "ACTIVE") {
-    throw new ApiError(403, "Account is not active");
+  if (user.status === "SUSPENDED") {
+    throw new ApiError(403, "Account has been suspended. Please contact your admnistrator");
   }
 
   const token = generateToken({

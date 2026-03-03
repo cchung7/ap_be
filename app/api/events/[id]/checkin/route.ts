@@ -1,3 +1,4 @@
+// D:\ap_be\app\api\events\[id]\checkin\route.ts
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
@@ -13,6 +14,16 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
   const eventId = params.id;
 
   const me = await requireAuth(["ADMIN", "MEMBER"]);
+
+  const user = await prisma.user.findUnique({
+    where: { id: me.id },
+    select: { status: true, name: true, email: true },
+  });
+
+  if (!user) throw new ApiError(401, "Authorization Failed!");
+  if (user.status !== "ACTIVE") {
+    throw new ApiError(403, "Account pending approval");
+  }
 
   const { code } = checkinSchema.parse(await (request as any).json());
 
@@ -35,7 +46,6 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
   });
 
   if (!attendance) {
-    // Policy choice: allow walk-ins or require registration
     throw new ApiError(400, "You must be registered to check in");
   }
 
@@ -63,9 +73,9 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
     await tx.recentActivity.create({
       data: {
         activityType: ActivityType.USER_CHECKED_IN,
-        description: `${me.name ?? me.email} checked in to: ${event.title} (+${points} pts)`,
+        description: `${user.name ?? user.email} checked in to: ${event.title} (+${points} pts)`,
         userId: me.id,
-        userName: me.name ?? me.email,
+        userName: user.name ?? user.email,
         metadata: JSON.stringify({ eventId, points }),
       },
     });
