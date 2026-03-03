@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start -p 4000",
     "prisma:generate": "prisma generate",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
@@ -16,11 +17,17 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.7",
-    "@types/node": "^20.0.0",
-    "@types/react": "19.2.14",
+    "@types/node": "^20.19.35",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^10.0.2",
+    "eslint-plugin-prettier": "^5.5.5",
+    "globals": "^17.4.0",
     "prisma": "^6.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
   }
 }

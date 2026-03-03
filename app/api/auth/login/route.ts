@@ -7,6 +7,9 @@ import { ApiError } from "@/src/lib/apiError";
 import { generateToken } from "@/src/lib/jwt";
 import { verifyPassword } from "@/src/lib/password";
 import { loginSchema } from "@/src/lib/zodSchemas";
+import { withCors, corsPreflight } from "@/src/lib/cors";
+
+export const OPTIONS = (req: NextRequest) => corsPreflight(req);
 
 export const POST = withApiHandler(async (req?: any) => {
   const request = req as NextRequest;
@@ -41,7 +44,6 @@ export const POST = withApiHandler(async (req?: any) => {
     name: user.name,
   });
 
-  // Build the JSON response using your existing helper
   const payload = sendResponse({
     statusCode: 200,
     success: true,
@@ -49,21 +51,19 @@ export const POST = withApiHandler(async (req?: any) => {
     data: { token, role: user.role },
   });
 
-  // Set cookie on the response
   const res = NextResponse.json(payload, { status: 200 });
 
   const cookieName = process.env.COOKIE_NAME || "token";
   const secure = (process.env.COOKIE_SECURE || "false") === "true";
-  const sameSite = (process.env.COOKIE_SAMESITE as "lax" | "strict" | "none") || "lax";
+  const sameSite =
+    (process.env.COOKIE_SAMESITE as "lax" | "strict" | "none") || "lax";
 
   res.cookies.set(cookieName, token, {
     httpOnly: true,
     secure,
     sameSite,
     path: "/",
-    // optional but recommended:
-    // maxAge: 60 * 60 * 24 * 7, // 7 days
   });
 
-  return res;
+  return withCors(request, res);
 }) as any;
