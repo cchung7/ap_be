@@ -8,11 +8,19 @@ export function getCookieName() {
   return process.env.COOKIE_NAME || "token";
 }
 
-export async function optionalAuth(): Promise<(TokenPayload & { iat?: number; exp?: number }) | null> {
+export async function optionalAuth(): Promise<
+  (TokenPayload & { iat?: number; exp?: number }) | null
+> {
   const jar = await cookies();
   const token = jar.get(getCookieName())?.value;
   if (!token) return null;
-  return verifyToken(token);
+
+  try {
+    return verifyToken(token);
+  } catch {
+    // Treat invalid/expired token as "logged out" instead of throwing 500
+    return null;
+  }
 }
 
 export async function requireAuth(
@@ -25,11 +33,16 @@ export async function requireAuth(
     throw new ApiError(401, "Authorization Failed!");
   }
 
-  const user = verifyToken(token);
+  let user: TokenPayload & { iat?: number; exp?: number };
+  try {
+    user = verifyToken(token);
+  } catch {
+    throw new ApiError(401, "Authorization Failed!");
+  }
 
   if (roles?.length && !roles.includes(user.role as AllowedRole)) {
     throw new ApiError(403, "Forbidden!");
   }
 
-  return user;  
+  return user;
 }
