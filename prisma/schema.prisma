@@ -57,7 +57,7 @@ model User {
 
   @@map("users")
 }
-
+  
 model Event {
   id                 String   @id @default(auto()) @map("_id") @db.ObjectId
   title              String
