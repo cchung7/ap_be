@@ -54,7 +54,7 @@ export const POST = withApiHandler(async (req?: any) => {
       password: hashed,
       role: "MEMBER",
       status: "PENDING",
-
+      subRole: null,
       academicYear: academicYear ? academicYear.toString() : null,
       major: major ? major.toString() : null,
       profileImageUrl: profileImageUrl ? profileImageUrl.toString() : null,
@@ -65,6 +65,7 @@ export const POST = withApiHandler(async (req?: any) => {
       role: true,
       name: true,
       status: true,
+      subRole: true,
       academicYear: true,
       major: true,
       profileImageUrl: true,
