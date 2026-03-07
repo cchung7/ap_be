@@ -35,11 +35,17 @@ enum ActivityType {
   CHECKIN_CODE_ROTATED
 }
 
+enum EventCategory {
+  VOLUNTEERING
+  SOCIAL
+  PROFESSIONAL_DEVELOPMENT
+}
+
 model User {
   id              String     @id @default(auto()) @map("_id") @db.ObjectId
   name            String
   email           String     @unique
-  password        String     // bcrypt hash
+  password        String
   role            UserRole   @default(MEMBER)
   subRole         String?
   status          UserStatus @default(ACTIVE)
@@ -55,31 +61,33 @@ model User {
 
   attendances     EventAttendance[]
 
-  @@map("users")  
+  @@map("users")
 }
-  
+
 model Event {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
   title              String
+  category           EventCategory @default(VOLUNTEERING)
   date               DateTime
   startTime          String
   endTime            String
   location           String
   description        String?
-  capacity           Int      @default(0)
-  totalRegistered    Int      @default(0)
+  capacity           Int           @default(0)
+  totalRegistered    Int           @default(0)
 
-  pointsValue        Int      @default(0)
+  pointsValue        Int           @default(0)
 
   checkInCodeHash    String?
   checkInCodeExpires DateTime?
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   attendances        EventAttendance[]
 
   @@index([date])
+  @@index([category, date])
   @@map("events")
 }
 

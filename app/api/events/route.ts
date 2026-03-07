@@ -4,7 +4,6 @@ import { prisma } from "@/src/lib/prisma";
 import { optionalAuth } from "@/src/lib/auth";
 
 function getChicagoBoundariesUTC() {
-  // Minimal: uses server local time. If you want full TZ correctness, add date-fns-tz later.
   const now = new Date();
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
@@ -13,14 +12,61 @@ function getChicagoBoundariesUTC() {
   return { startUTC: start, endUTC: end };
 }
 
+function combineDateAndTimeToIso(dateValue: Date, time: string) {
+  const datePart = dateValue.toISOString().slice(0, 10);
+  return new Date(`${datePart}T${time}:00.000Z`).toISOString();
+}
+
+function toEventCardDto(
+  e: {
+    id: string;
+    title: string;
+    category: "VOLUNTEERING" | "SOCIAL" | "PROFESSIONAL_DEVELOPMENT";
+    date: Date;
+    startTime: string;
+    endTime: string;
+    location: string;
+    description: string | null;
+    capacity: number;
+    totalRegistered: number;
+    pointsValue: number;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  isRegistered: boolean,
+  viewerAuthenticated: boolean,
+  currentStatus: "UPCOMING" | "TODAY" | "PAST"
+) {
+  return {
+    id: e.id,
+    title: e.title,
+    category: e.category,
+    startsAt: combineDateAndTimeToIso(e.date, e.startTime),
+    endsAt: e.endTime ? combineDateAndTimeToIso(e.date, e.endTime) : undefined,
+    location: e.location,
+    capacity: e.capacity,
+    description: e.description ?? "",
+    totalRegistered: e.totalRegistered,
+    pointsValue: e.pointsValue,
+    date: e.date,
+    startTime: e.startTime,
+    endTime: e.endTime,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+    currentStatus,
+    isRegistered,
+    viewerAuthenticated,
+  };
+}
+
 export const GET = withApiHandler(async (req?: any) => {
   const request = req as Request;
   const url = new URL(request.url);
 
   const searchTerm = url.searchParams.get("searchTerm") || "";
-  const status = url.searchParams.get("status") || ""; // UPCOMING | TODAY | PAST
-  const page = Number(url.searchParams.get("page") || "1");
-  const limit = Number(url.searchParams.get("limit") || "12");
+  const status = url.searchParams.get("status") || "";
+  const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
+  const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || "12")));
   const skip = (page - 1) * limit;
 
   const and: any[] = [];
@@ -50,7 +96,7 @@ export const GET = withApiHandler(async (req?: any) => {
       where,
       skip,
       take: limit,
-      orderBy: { date: "asc" },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
     }),
     prisma.event.count({ where }),
   ]);
@@ -70,18 +116,24 @@ export const GET = withApiHandler(async (req?: any) => {
     else if (e.date >= startUTC && e.date <= endUTC) currentStatus = "TODAY";
     else currentStatus = "PAST";
 
-    return {
-      ...e,
-      currentStatus,
-      isRegistered: tokenUser?.id ? registeredSet.has(e.id.toString()) : false,
-    };
+    return toEventCardDto(
+      e,
+      tokenUser?.id ? registeredSet.has(e.id.toString()) : false,
+      !!tokenUser?.id,
+      currentStatus
+    );
   });
 
   return sendResponse({
     statusCode: 200,
     success: true,
     message: "Events fetched successfully",
-    meta: { page, limit, total },
+    meta: {
+      page,
+      limit,
+      total,
+      totalPage: Math.ceil(total / limit),
+    },
     data,
   });
 }) as any;
