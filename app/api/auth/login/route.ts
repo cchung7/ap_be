@@ -21,7 +21,7 @@ export const POST = withApiHandler(async (req?: any) => {
 
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    select: {
+    select: { 
       id: true,
       email: true,
       password: true,

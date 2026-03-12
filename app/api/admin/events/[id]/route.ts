@@ -13,18 +13,32 @@ export const PATCH = withApiHandler(async (req?: any, ctx?: any) => {
 
   const admin = await requireAuth(["ADMIN"]);
 
-  const raw = updateEventSchema.parse(await (request as any).json());
+  const raw = updateEventSchema.parse(await request.json());
 
-  const data: any = { ...raw };
-  if (raw.date) {
+  const data: Record<string, unknown> = { ...raw };
+
+  if (raw.date !== undefined) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw.date)) {
+      throw new ApiError(400, "Date must be in YYYY-MM-DD format");
+    }
+
     const [y, m, d] = raw.date.split("-").map(Number);
-    data.date = new Date(Date.UTC(y, m - 1, d));
+    const parsedDate = new Date(Date.UTC(y, m - 1, d));
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new ApiError(400, "Invalid date");
+    }
+
+    data.date = parsedDate;
   }
 
   const exists = await prisma.event.findUnique({ where: { id } });
   if (!exists) throw new ApiError(404, "Event not found");
 
-  const updated = await prisma.event.update({ where: { id }, data });
+  const updated = await prisma.event.update({
+    where: { id },
+    data,
+  });
 
   await prisma.recentActivity.create({
     data: {
@@ -55,6 +69,7 @@ export const DELETE = withApiHandler(async (_req?: any, ctx?: any) => {
 
   const deleted = await prisma.$transaction(async (tx) => {
     await tx.eventAttendance.deleteMany({ where: { eventId: id } });
+
     const ev = await tx.event.delete({ where: { id } });
 
     await tx.recentActivity.create({

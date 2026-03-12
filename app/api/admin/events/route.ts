@@ -4,20 +4,29 @@ import { prisma } from "@/src/lib/prisma";
 import { requireAuth } from "@/src/lib/auth";
 import { createEventSchema } from "@/src/lib/zodSchemas";
 import { ActivityType } from "@prisma/client";
+import { ApiError } from "@/src/lib/apiError";
 
 export const POST = withApiHandler(async (req?: any) => {
   const request = req as Request;
   const admin = await requireAuth(["ADMIN"]);
 
-  const raw = createEventSchema.parse(await (request as any).json());
+  const raw = createEventSchema.parse(await request.json());
 
-  // Convert YYYY-MM-DD to UTC midnight Date (consistent & avoids timezone drift)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw.date)) {
+    throw new ApiError(400, "Date must be in YYYY-MM-DD format");
+  }
+
   const [y, m, d] = raw.date.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
+
+  if (Number.isNaN(date.getTime())) {
+    throw new ApiError(400, "Invalid date");
+  }
 
   const created = await prisma.event.create({
     data: {
       title: raw.title,
+      category: raw.category,
       date,
       startTime: raw.startTime,
       endTime: raw.endTime,
