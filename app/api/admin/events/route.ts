@@ -6,6 +6,21 @@ import { createEventSchema } from "@/src/lib/zodSchemas";
 import { ActivityType } from "@prisma/client";
 import { ApiError } from "@/src/lib/apiError";
 
+export const GET = withApiHandler(async () => {
+  await requireAuth(["ADMIN"]);
+
+  const events = await prisma.event.findMany({
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  });
+
+  return sendResponse({
+    statusCode: 200,
+    success: true,
+    message: "Events fetched successfully",
+    data: events,
+  });
+}) as any;
+
 export const POST = withApiHandler(async (req?: any) => {
   const request = req as Request;
   const admin = await requireAuth(["ADMIN"]);
