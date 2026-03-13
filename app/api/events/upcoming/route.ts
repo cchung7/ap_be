@@ -3,30 +3,55 @@ import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
 import { optionalAuth } from "@/src/lib/auth";
 
+function getUtcDayWindow() {
+  const now = new Date();
+
+  const startUTC = new Date(now);
+  startUTC.setUTCHours(0, 0, 0, 0);
+
+  const endUTC = new Date(now);
+  endUTC.setUTCHours(23, 59, 59, 999);
+
+  const tomorrowStartUTC = new Date(startUTC);
+  tomorrowStartUTC.setUTCDate(tomorrowStartUTC.getUTCDate() + 1);
+
+  return { startUTC, endUTC, tomorrowStartUTC };
+}
+
+function getNowUtcHHMM() {
+  const now = new Date();
+  const hh = String(now.getUTCHours()).padStart(2, "0");
+  const mm = String(now.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 function combineDateAndTimeToIso(dateValue: Date, time: string) {
   const datePart = dateValue.toISOString().slice(0, 10);
   return new Date(`${datePart}T${time}:00.000Z`).toISOString();
 }
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 export const GET = withApiHandler(async (req?: any) => {
   const request = req as Request;
   const url = new URL(request.url);
-  const limit = Math.max(
-    1,
-    Math.min(50, Number(url.searchParams.get("limit") || "3"))
-  );
+  const limit = Math.max(1, Math.min(50, Number(url.searchParams.get("limit") || "3")));
 
   const tokenUser = await optionalAuth();
-  const todayStart = startOfToday();
+
+  const { startUTC, endUTC, tomorrowStartUTC } = getUtcDayWindow();
+  const nowHHMM = getNowUtcHHMM();
 
   const events = await prisma.event.findMany({
-    where: { date: { gte: todayStart } },
+    where: {
+      OR: [
+        { date: { gte: tomorrowStartUTC } },
+        {
+          AND: [
+            { date: { gte: startUTC, lte: endUTC } },
+            { startTime: { gte: nowHHMM } },
+          ],
+        },
+      ],
+    },
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
     take: limit,
   });

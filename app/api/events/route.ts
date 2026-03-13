@@ -4,13 +4,26 @@ import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
 import { optionalAuth } from "@/src/lib/auth";
 
-function getChicagoBoundariesUTC() {
+function getUtcDayWindow() {
   const now = new Date();
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-  return { startUTC: start, endUTC: end };
+
+  const startUTC = new Date(now);
+  startUTC.setUTCHours(0, 0, 0, 0);
+
+  const endUTC = new Date(now);
+  endUTC.setUTCHours(23, 59, 59, 999);
+
+  const tomorrowStartUTC = new Date(startUTC);
+  tomorrowStartUTC.setUTCDate(tomorrowStartUTC.getUTCDate() + 1);
+
+  return { startUTC, endUTC, tomorrowStartUTC };
+}
+
+function getNowUtcHHMM() {
+  const now = new Date();
+  const hh = String(now.getUTCHours()).padStart(2, "0");
+  const mm = String(now.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
 }
 
 function combineDateAndTimeToIso(dateValue: Date, time: string) {
@@ -67,7 +80,10 @@ export const GET = withApiHandler(async (req?: any) => {
   const searchTerm = url.searchParams.get("searchTerm") || "";
   const status = url.searchParams.get("status") || "";
   const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
-  const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || "12")));
+  const limit = Math.max(
+    1,
+    Math.min(100, Number(url.searchParams.get("limit") || "12"))
+  );
   const skip = (page - 1) * limit;
 
   const and: any[] = [];
@@ -82,11 +98,27 @@ export const GET = withApiHandler(async (req?: any) => {
     });
   }
 
-  const { startUTC, endUTC } = getChicagoBoundariesUTC();
+  const { startUTC, endUTC, tomorrowStartUTC } = getUtcDayWindow();
+  const nowHHMM = getNowUtcHHMM();
 
-  if (status === "UPCOMING") and.push({ date: { gte: startUTC } });
-  if (status === "TODAY") and.push({ date: { gte: startUTC, lte: endUTC } });
-  if (status === "PAST") and.push({ date: { lt: startUTC } });
+  if (status === "TODAY") {
+    and.push({ date: { gte: startUTC, lte: endUTC } });
+  } else if (status === "UPCOMING") {
+    // UPCOMING = future days OR (today AND startTime >= now)
+    and.push({
+      OR: [
+        { date: { gte: tomorrowStartUTC } },
+        {
+          AND: [
+            { date: { gte: startUTC, lte: endUTC } },
+            { startTime: { gte: nowHHMM } },
+          ],
+        },
+      ],
+    });
+  } else if (status === "PAST") {
+    and.push({ date: { lt: startUTC } });
+  }
 
   const where = and.length ? { AND: and } : {};
 
@@ -111,9 +143,14 @@ export const GET = withApiHandler(async (req?: any) => {
     registeredSet = new Set(regs.map((r) => r.eventId.toString()));
   }
 
+  const nowMs = Date.now();
+
   const data = events.map((e) => {
+    const startsAtIso = combineDateAndTimeToIso(e.date, e.startTime);
+    const startsAtMs = new Date(startsAtIso).getTime();
+
     let currentStatus: "UPCOMING" | "TODAY" | "PAST" = "UPCOMING";
-    if (e.date > endUTC) currentStatus = "UPCOMING";
+    if (Number.isFinite(startsAtMs) && startsAtMs > nowMs) currentStatus = "UPCOMING";
     else if (e.date >= startUTC && e.date <= endUTC) currentStatus = "TODAY";
     else currentStatus = "PAST";
 
