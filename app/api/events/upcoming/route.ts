@@ -8,16 +8,25 @@ function combineDateAndTimeToIso(dateValue: Date, time: string) {
   return new Date(`${datePart}T${time}:00.000Z`).toISOString();
 }
 
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export const GET = withApiHandler(async (req?: any) => {
   const request = req as Request;
   const url = new URL(request.url);
-  const limit = Math.max(1, Math.min(50, Number(url.searchParams.get("limit") || "3")));
+  const limit = Math.max(
+    1,
+    Math.min(50, Number(url.searchParams.get("limit") || "3"))
+  );
 
   const tokenUser = await optionalAuth();
-  const now = new Date();
+  const todayStart = startOfToday();
 
   const events = await prisma.event.findMany({
-    where: { date: { gt: now } },
+    where: { date: { gte: todayStart } },
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
     take: limit,
   });

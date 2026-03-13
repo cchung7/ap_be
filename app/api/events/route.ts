@@ -66,7 +66,10 @@ export const GET = withApiHandler(async (req?: any) => {
   const searchTerm = url.searchParams.get("searchTerm") || "";
   const status = url.searchParams.get("status") || "";
   const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
-  const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || "12")));
+  const limit = Math.max(
+    1,
+    Math.min(100, Number(url.searchParams.get("limit") || "12"))
+  );
   const skip = (page - 1) * limit;
 
   const and: any[] = [];
@@ -83,7 +86,7 @@ export const GET = withApiHandler(async (req?: any) => {
 
   const { startUTC, endUTC } = getChicagoBoundariesUTC();
 
-  if (status === "UPCOMING") and.push({ date: { gt: endUTC } });
+  if (status === "UPCOMING") and.push({ date: { gte: startUTC } });
   if (status === "TODAY") and.push({ date: { gte: startUTC, lte: endUTC } });
   if (status === "PAST") and.push({ date: { lt: startUTC } });
 
