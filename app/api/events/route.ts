@@ -1,3 +1,4 @@
+// D:\ap_be\app\api\events\route.ts
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
@@ -66,10 +67,7 @@ export const GET = withApiHandler(async (req?: any) => {
   const searchTerm = url.searchParams.get("searchTerm") || "";
   const status = url.searchParams.get("status") || "";
   const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
-  const limit = Math.max(
-    1,
-    Math.min(100, Number(url.searchParams.get("limit") || "12"))
-  );
+  const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || "12")));
   const skip = (page - 1) * limit;
 
   const and: any[] = [];
