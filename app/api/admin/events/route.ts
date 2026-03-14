@@ -3,8 +3,8 @@ import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
 import { requireAuth } from "@/src/lib/auth";
 import { createEventSchema } from "@/src/lib/zodSchemas";
-import { ActivityType } from "@prisma/client";
 import { ApiError } from "@/src/lib/apiError";
+import { ActivityType } from "@prisma/client";
 
 export const GET = withApiHandler(async () => {
   await requireAuth(["ADMIN"]);

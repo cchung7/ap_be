@@ -2,17 +2,19 @@
   "name": "ap-be",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 4000",
-    "build": "next build",
+    "dev": "prisma generate --schema=prisma && next dev -p 4000",
+    "build": "prisma generate --schema=prisma && next build",
     "start": "next start -p 4000",
-    "prisma:generate": "prisma generate",
-    "prisma:dbpush": "prisma db push",
-    "prisma:studio": "prisma studio",
-    "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma db push && next build"
+
+    "prisma:generate": "prisma generate --schema=prisma",
+    "prisma:dbpush": "prisma db push --schema=prisma",
+    "prisma:studio": "prisma studio --schema=prisma",
+
+    "postinstall": "prisma generate --schema=prisma",
+    "vercel-build": "prisma generate --schema=prisma && prisma db push --schema=prisma && next build"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0",
+    "@prisma/client": "6.19.2",
     "bcrypt": "^5.1.1",
     "jsonwebtoken": "^9.0.2",
     "next": "^15.0.0",
@@ -28,8 +30,9 @@
     "eslint": "^10.0.2",
     "eslint-plugin-prettier": "^5.5.5",
     "globals": "^17.4.0",
-    "prisma": "^6.0.0",
+    "prisma": "6.19.2",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
-  } 
+    "typescript-eslint": "^8.56.1",
+    "@prisma/engines": "6.19.2"
+  }
 }

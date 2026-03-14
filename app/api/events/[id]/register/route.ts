@@ -4,7 +4,6 @@ import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
 import { requireAuth } from "@/src/lib/auth";
 import { ApiError } from "@/src/lib/apiError";
-import { ActivityType } from "@prisma/client";
 
 export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
   const { params } = ctx as { params: { id: string } };
@@ -12,7 +11,6 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
 
   const me = await requireAuth(["ADMIN", "MEMBER"]);
 
-  // ✅ Enforce ACTIVE for event registration
   const user = await prisma.user.findUnique({
     where: { id: me.id },
     select: { status: true, name: true, email: true },
@@ -37,7 +35,7 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
     throw new ApiError(400, "User already registered for this event");
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: any) => {
     const attendance = await tx.eventAttendance.create({
       data: {
         userId: me.id,
@@ -53,7 +51,7 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
 
     await tx.recentActivity.create({
       data: {
-        activityType: ActivityType.USER_REGISTERED,
+        activityType: "USER_REGISTERED" as any,
         description: `${user.name ?? user.email} registered for event: ${event.title}`,
         userId: me.id,
         userName: user.name ?? user.email,

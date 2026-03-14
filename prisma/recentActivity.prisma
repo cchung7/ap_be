@@ -1,0 +1,14 @@
+model RecentActivity {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  activityType ActivityType @default(GENERAL)
+  description  String
+  userId       String?      @db.ObjectId
+  userName     String?
+  metadata     String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([activityType, createdAt])
+  @@index([userId])
+  @@map("recent_activities")
+}

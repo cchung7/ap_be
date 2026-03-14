@@ -80,10 +80,7 @@ export const GET = withApiHandler(async (req?: any) => {
   const searchTerm = url.searchParams.get("searchTerm") || "";
   const status = url.searchParams.get("status") || "";
   const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
-  const limit = Math.max(
-    1,
-    Math.min(100, Number(url.searchParams.get("limit") || "12"))
-  );
+  const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || "12")));
   const skip = (page - 1) * limit;
 
   const and: any[] = [];
@@ -104,7 +101,6 @@ export const GET = withApiHandler(async (req?: any) => {
   if (status === "TODAY") {
     and.push({ date: { gte: startUTC, lte: endUTC } });
   } else if (status === "UPCOMING") {
-    // UPCOMING = future days OR (today AND startTime >= now)
     and.push({
       OR: [
         { date: { gte: tomorrowStartUTC } },
@@ -135,11 +131,16 @@ export const GET = withApiHandler(async (req?: any) => {
   ]);
 
   let registeredSet = new Set<string>();
-  if (tokenUser?.id) {
+
+  if (tokenUser?.id && events.length) {
     const regs = await prisma.eventAttendance.findMany({
-      where: { userId: tokenUser.id },
+      where: {
+        userId: tokenUser.id,
+        eventId: { in: events.map((e) => e.id) as any },
+      },
       select: { eventId: true },
     });
+
     registeredSet = new Set(regs.map((r) => r.eventId.toString()));
   }
 

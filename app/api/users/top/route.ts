@@ -16,7 +16,6 @@ export const GET = withApiHandler(async (req?: any) => {
   const users = await prisma.user.findMany({
     where: {
       status: "ACTIVE",
-      // role filter removed so ADMIN can appear in ranking
     },
     orderBy: { pointsTotal: "desc" },
     take: limit,

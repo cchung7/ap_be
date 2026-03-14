@@ -1,4 +1,3 @@
-// D:\ap_be\app\api\events\[id]\checkin\route.ts
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";

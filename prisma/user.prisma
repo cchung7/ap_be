@@ -1,0 +1,23 @@
+model User {
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  email           String     @unique
+  password        String
+  role            UserRole   @default(MEMBER)
+  subRole         String?
+  status          UserStatus @default(ACTIVE)
+
+  academicYear    String?
+  major           String?
+  profileImageUrl String?
+
+  pointsTotal     Int        @default(0)
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  attendances     EventAttendance[]
+
+  @@index([status, pointsTotal, name])
+  @@map("users")
+}

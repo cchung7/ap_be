@@ -1,0 +1,32 @@
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+}
+
+enum AttendanceStatus {
+  REGISTERED
+  CHECKED_IN
+  CANCELED
+}
+
+enum ActivityType {
+  GENERAL
+  EVENT_CREATED
+  EVENT_UPDATED
+  EVENT_DELETED
+  USER_REGISTERED
+  USER_CHECKED_IN
+  CHECKIN_CODE_ROTATED
+}
+
+enum EventCategory {
+  VOLUNTEERING
+  SOCIAL
+  PROFESSIONAL_DEVELOPMENT
+}

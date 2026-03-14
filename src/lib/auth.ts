@@ -18,7 +18,6 @@ export async function optionalAuth(): Promise<
   try {
     return verifyToken(token);
   } catch {
-    // Treat invalid/expired token as "logged out" instead of throwing 500
     return null;
   }
 }

@@ -16,7 +16,7 @@ export function withCors(req: NextRequest, res: NextResponse) {
 
   if (allowed.includes(origin)) {
     res.headers.set("Access-Control-Allow-Origin", origin);
-    res.headers.set("Vary", "Origin"); // critical when reflecting origin
+    res.headers.set("Vary", "Origin");
     res.headers.set("Access-Control-Allow-Credentials", "true");
     res.headers.set(
       "Access-Control-Allow-Headers",
