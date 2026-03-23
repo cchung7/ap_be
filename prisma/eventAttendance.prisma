@@ -19,4 +19,3 @@ model EventAttendance {
   @@index([userId, status])
   @@map("event_attendances")
 }
-    
