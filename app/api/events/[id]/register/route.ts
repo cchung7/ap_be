@@ -17,8 +17,17 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
   });
 
   if (!user) throw new ApiError(401, "Authorization Failed!");
-  if (user.status !== "ACTIVE") {
+
+  if (user.status === "PENDING") {
     throw new ApiError(403, "Account pending approval");
+  }
+
+  if (user.status === "SUSPENDED") {
+    throw new ApiError(403, "Account is inactive");
+  }
+
+  if (user.status !== "ACTIVE") {
+    throw new ApiError(403, "Access denied");
   }
 
   const event = await prisma.event.findUnique({ where: { id: eventId } });
@@ -31,6 +40,7 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
   const existing = await prisma.eventAttendance.findFirst({
     where: { userId: me.id, eventId },
   });
+
   if (existing) {
     throw new ApiError(400, "User already registered for this event");
   }
