@@ -19,7 +19,7 @@ model Event {
   updatedAt          DateTime      @updatedAt
 
   attendances        EventAttendance[]
-
+  
   @@index([date])
   @@index([date, startTime])
   @@index([category, date])
