@@ -5,11 +5,9 @@
     "dev": "prisma generate --schema=prisma && next dev -p 4000",
     "build": "prisma generate --schema=prisma && next build",
     "start": "next start -p 4000",
-
     "prisma:generate": "prisma generate --schema=prisma",
     "prisma:dbpush": "prisma db push --schema=prisma",
     "prisma:studio": "prisma studio --schema=prisma",
-
     "postinstall": "prisma generate --schema=prisma",
     "vercel-build": "prisma generate --schema=prisma && prisma db push --schema=prisma && next build"
   },
@@ -18,13 +16,16 @@
     "bcrypt": "^5.1.1",
     "jsonwebtoken": "^9.0.2",
     "next": "^15.0.0",
+    "nodemailer": "^8.0.4",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@prisma/engines": "6.19.2",
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.19.35",
+    "@types/nodemailer": "^7.0.11",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "eslint": "^10.0.2",
@@ -32,7 +33,6 @@
     "globals": "^17.4.0",
     "prisma": "6.19.2",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1",
-    "@prisma/engines": "6.19.2"
+    "typescript-eslint": "^8.56.1"
   }
 }
