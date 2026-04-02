@@ -38,48 +38,69 @@ export const GET = withApiHandler(async () => {
 
   const utcDayStart = getUtcDayStart();
 
-  const [activities, attendances] = await Promise.all([
-    prisma.recentActivity.findMany({
-      where: {
-        userId: me.id,
-        activityType: {
-          in: ["USER_REGISTERED", "USER_CHECKED_IN"] as any,
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      select: {
-        id: true,
-        activityType: true,
-        description: true,
-        createdAt: true,
-      },
-    }),
-
-    prisma.eventAttendance.findMany({
-      where: {
-        userId: me.id,
-        status: {
-          in: ["REGISTERED", "CHECKED_IN"] as any,
-        },
-      },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            category: true,
-            date: true,
-            startTime: true,
-            endTime: true,
-            location: true,
-            description: true,
-            pointsValue: true,
+  const [activities, attendances, totalEventsAttended, rankedMembers] =
+    await Promise.all([
+      prisma.recentActivity.findMany({
+        where: {
+          userId: me.id,
+          activityType: {
+            in: ["USER_REGISTERED", "USER_CHECKED_IN"] as any,
           },
         },
-      },
-    }),
-  ]);
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: {
+          id: true,
+          activityType: true,
+          description: true,
+          createdAt: true,
+        },
+      }),
+
+      prisma.eventAttendance.findMany({
+        where: {
+          userId: me.id,
+          status: {
+            in: ["REGISTERED", "CHECKED_IN"] as any,
+          },
+        },
+        include: {
+          event: {
+            select: {
+              id: true,
+              title: true,
+              category: true,
+              date: true,
+              startTime: true,
+              endTime: true,
+              location: true,
+              description: true,
+              pointsValue: true,
+            },
+          },
+        },
+      }),
+
+      prisma.eventAttendance.count({
+        where: {
+          userId: me.id,
+          status: "CHECKED_IN" as any,
+        },
+      }),
+
+      prisma.user.findMany({
+        where: {
+          role: "MEMBER" as any,
+          status: "ACTIVE" as any,
+        },
+        orderBy: [{ pointsTotal: "desc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          pointsTotal: true,
+        },
+      }),
+    ]);
 
   const upcomingAttendances = attendances
     .filter((attendance) => {
@@ -109,6 +130,15 @@ export const GET = withApiHandler(async () => {
     pointsAwarded: attendance.pointsAwarded,
   }));
 
+  const leaderboardRankIndex = rankedMembers.findIndex((member) => member.id === me.id);
+
+  const leaderboardRank = leaderboardRankIndex >= 0 ? leaderboardRankIndex + 1 : null;
+
+  const leaderboardTopFivePreview = rankedMembers.slice(0, 5).map((member, index) => ({
+    rank: index + 1,
+    name: member.name,
+  }));
+
   return sendResponse({
     statusCode: 200,
     success: true,
@@ -118,9 +148,12 @@ export const GET = withApiHandler(async () => {
       stats: {
         upcomingEvents: upcomingAttendances.length,
         totalPoints: me.pointsTotal ?? 0,
+        totalEventsAttended,
+        leaderboardRank,
       },
       activities,
       upcomingEventsPreview,
+      leaderboardTopFivePreview,
     },
   });
 }) as any;
