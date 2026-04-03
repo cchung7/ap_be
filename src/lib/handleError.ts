@@ -50,13 +50,11 @@ export function handleZodError(err: ZodError) {
 }
 
 export function normalizeError(err: unknown) {
-  // Default
   let statusCode = 500;
   let message = "Something went wrong!";
   let errorSources: any[] = [];
   let errorDetails: any = null;
 
-  // Zod
   if (err instanceof ZodError) {
     const z = handleZodError(err);
     statusCode = z.statusCode;
@@ -65,7 +63,6 @@ export function normalizeError(err: unknown) {
     return { statusCode, message, errorSources, errorDetails: err };
   }
 
-  // ApiError
   if (err instanceof ApiError) {
     statusCode = err.statusCode;
     message = err.message;
@@ -73,7 +70,42 @@ export function normalizeError(err: unknown) {
     return { statusCode, message, errorSources, errorDetails: err };
   }
 
-  // Prisma known buckets
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === "P2002") {
+      statusCode = 409;
+      message = "A record with that value already exists.";
+
+      const target = Array.isArray(err.meta?.target)
+        ? err.meta?.target.join(", ")
+        : String(err.meta?.target || "");
+
+      if (target.toLowerCase().includes("email")) {
+        message = "That email address is already in use.";
+      }
+
+      errorSources = [
+        {
+          type: "PrismaClientKnownRequestError",
+          code: err.code,
+          target,
+        },
+      ];
+
+      return { statusCode, message, errorSources, errorDetails: err };
+    }
+
+    statusCode = 400;
+    message = err.message || "Database request failed.";
+    errorSources = [
+      {
+        type: "PrismaClientKnownRequestError",
+        code: err.code,
+        meta: err.meta ?? null,
+      },
+    ];
+    return { statusCode, message, errorSources, errorDetails: err };
+  }
+
   if (err instanceof Prisma.PrismaClientValidationError) {
     statusCode = 400;
     message = parsePrismaValidationError(err.message);
@@ -103,7 +135,6 @@ export function normalizeError(err: unknown) {
     return { statusCode, message, errorSources, errorDetails: err };
   }
 
-  // Generic JS errors
   if (err instanceof Error) {
     message = err.message || message;
     errorSources = [err.name || "Error"];
