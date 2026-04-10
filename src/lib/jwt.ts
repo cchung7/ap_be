@@ -1,5 +1,10 @@
-import jwt, { type JwtPayload, type Secret, type SignOptions } from "jsonwebtoken";
+import jwt, {
+  type JwtPayload,
+  type Secret,
+  type SignOptions,
+} from "jsonwebtoken";
 import { ApiError } from "./apiError";
+import { getAuthSessionExpiresIn } from "./authSession";
 
 export type TokenPayload = {
   id: string;
@@ -9,15 +14,17 @@ export type TokenPayload = {
 };
 
 function getJwtSecret(): Secret {
-  const s = process.env.JWT_SECRET;
-  if (!s) throw new ApiError(500, "JWT_SECRET is not set");
-  return s as Secret;
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    throw new ApiError(500, "JWT_SECRET is not set");
+  }
+
+  return secret as Secret;
 }
 
 function getJwtExpiresIn(): SignOptions["expiresIn"] {
-  // jsonwebtoken supports "7d", "1h", seconds as number, etc.
-  // Keeping it as SignOptions["expiresIn"] avoids TS pain.
-  return (process.env.JWT_EXPIRES_IN || "7d") as SignOptions["expiresIn"];
+  return getAuthSessionExpiresIn();
 }
 
 export function generateToken(payload: TokenPayload): string {
@@ -29,7 +36,6 @@ export function generateToken(payload: TokenPayload): string {
     expiresIn,
   };
 
-  // Ensure we call the correct function even if module interop is weird
   const signFn: typeof jwt.sign =
     (jwt as any)?.sign ?? (jwt as any)?.default?.sign;
 
@@ -58,7 +64,34 @@ export function verifyToken(token: string): JwtPayload & TokenPayload {
 
   try {
     return verifyFn(token, secret) as JwtPayload & TokenPayload;
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === "TokenExpiredError") {
+      throw new ApiError(401, "Session expired. Please sign in again.");
+    }
+
     throw new ApiError(401, "You are not authorized!");
+  }
+}
+
+export function decodeToken(
+  token: string
+): (JwtPayload & Partial<TokenPayload>) | null {
+  const decodeFn: typeof jwt.decode =
+    (jwt as any)?.decode ?? (jwt as any)?.default?.decode;
+
+  if (typeof decodeFn !== "function") {
+    return null;
+  }
+
+  try {
+    const decoded = decodeFn(token);
+
+    if (!decoded || typeof decoded !== "object") {
+      return null;
+    }
+
+    return decoded as JwtPayload & Partial<TokenPayload>;
+  } catch {
+    return null;
   }
 }
