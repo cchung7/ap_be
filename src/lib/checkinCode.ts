@@ -3,9 +3,11 @@ import crypto from "crypto";
 export function generateCheckinCode(length = 6) {
   const digits = "0123456789";
   let out = "";
+
   for (let i = 0; i < length; i++) {
-    out += digits[Math.floor(Math.random() * digits.length)];
+    out += digits[crypto.randomInt(0, digits.length)];
   }
+
   return out;
 }
 

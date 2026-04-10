@@ -8,6 +8,7 @@ import { prisma } from "@/src/lib/prisma";
 import { ApiError } from "@/src/lib/apiError";
 import { generateToken } from "@/src/lib/jwt";
 import { withCors, corsPreflight } from "@/src/lib/cors";
+import { setAuthCookie } from "@/src/lib/authCookies";
 
 export const OPTIONS = (req: NextRequest) => corsPreflight(req);
 
@@ -18,7 +19,6 @@ const signupSchema = z.object({
   academicYear: z.string().optional(),
   major: z.string().optional(),
   password: z.string().min(8),
-
   profileImageUrl: z.string().url().optional(),
 });
 
@@ -83,20 +83,10 @@ export const POST = withApiHandler(async (req?: any) => {
     statusCode: 201,
     success: true,
     message: "Signup successful",
-    data: { token, role: user.role },
+    data: { role: user.role },
   });
 
-  const cookieName = process.env.COOKIE_NAME || "token";
-  const secure = (process.env.COOKIE_SECURE || "false") === "true";
-  const sameSite =
-    (process.env.COOKIE_SAMESITE as "lax" | "strict" | "none") || "lax";
-
-  res.cookies.set(cookieName, token, {
-    httpOnly: true,
-    secure,
-    sameSite,
-    path: "/",
-  });
+  setAuthCookie(res, token);
 
   return withCors(request, res);
 }) as any;
