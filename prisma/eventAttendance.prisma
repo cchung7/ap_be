@@ -1,21 +1,21 @@
 model EventAttendance {
-  id                   String           @id @default(auto()) @map("_id") @db.ObjectId
-  userId               String           @db.ObjectId
-  eventId              String           @db.ObjectId
+  id                    String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String           @db.ObjectId
+  eventId               String           @db.ObjectId
 
-  status               AttendanceStatus @default(REGISTERED)
-  registeredAt         DateTime         @default(now())
-  checkedInAt          DateTime?
-  pointsAwarded        Int              @default(0)
+  status                AttendanceStatus @default(REGISTERED)
+  registeredAt          DateTime         @default(now())
+  checkedInAt           DateTime?
+  pointsAwarded         Int              @default(0)
 
-  failedCheckInAttempts Int             @default(0)
+  failedCheckInAttempts Int              @default(0)
   checkInLockedUntil    DateTime?
 
-  user                 User             @relation(fields: [userId], references: [id])
-  event                Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user                  User             @relation(fields: [userId], references: [id])
+  event                 Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
   @@unique([userId, eventId])
   @@index([eventId, status])

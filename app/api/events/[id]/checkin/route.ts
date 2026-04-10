@@ -7,6 +7,9 @@ import { checkinSchema } from "@/src/lib/zodSchemas";
 import { verifyCode } from "@/src/lib/checkinCode";
 import { ActivityType } from "@prisma/client";
 
+const MAX_FAILED_CHECKIN_ATTEMPTS = 5;
+const CHECKIN_LOCKOUT_MS = 15 * 60 * 1000;
+
 export const POST = withApiHandler(async (req?: any, ctx?: any) => {
   const request = req as Request;
   const { params } = ctx as { params: { id: string } };
@@ -19,26 +22,15 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
     select: { status: true, name: true, email: true },
   });
 
-  if (!user) throw new ApiError(401, "Authorization Failed!");
+  if (!user) {
+    throw new ApiError(401, "Authorization Failed!");
+  }
+
   if (user.status !== "ACTIVE") {
     throw new ApiError(403, "Account pending approval");
   }
 
-  const { code } = checkinSchema.parse(await (request as any).json());
-
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (!event) throw new ApiError(404, "Event not found");
-
-  if (!event.checkInCodeHash || !event.checkInCodeExpires) {
-    throw new ApiError(400, "Check-in code is not available");
-  }
-
-  if (event.checkInCodeExpires < new Date()) {
-    throw new ApiError(400, "Check-in code expired");
-  }
-
-  const ok = verifyCode(code, event.checkInCodeHash);
-  if (!ok) throw new ApiError(400, "Invalid check-in code");
+  const { code } = checkinSchema.parse(await request.json());
 
   const attendance = await prisma.eventAttendance.findFirst({
     where: { userId: me.id, eventId },
@@ -52,6 +44,63 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
     throw new ApiError(400, "You are already checked in");
   }
 
+  if (
+    attendance.checkInLockedUntil &&
+    attendance.checkInLockedUntil > new Date()
+  ) {
+    const secondsLeft = Math.ceil(
+      (attendance.checkInLockedUntil.getTime() - Date.now()) / 1000
+    );
+
+    throw new ApiError(
+      429,
+      `Too many failed attempts. Try again in ${secondsLeft} seconds.`
+    );
+  }
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+  });
+
+  if (!event) {
+    throw new ApiError(404, "Event not found");
+  }
+
+  if (!event.checkInCodeHash || !event.checkInCodeExpires) {
+    throw new ApiError(400, "Check-in code is not available");
+  }
+
+  if (event.checkInCodeExpires < new Date()) {
+    throw new ApiError(400, "Check-in code expired");
+  }
+
+  const ok = verifyCode(code, event.checkInCodeHash);
+
+  if (!ok) {
+    const newFailCount = (attendance.failedCheckInAttempts ?? 0) + 1;
+    const shouldLock = newFailCount >= MAX_FAILED_CHECKIN_ATTEMPTS;
+    const lockUntil = shouldLock
+      ? new Date(Date.now() + CHECKIN_LOCKOUT_MS)
+      : null;
+
+    await prisma.eventAttendance.update({
+      where: { id: attendance.id },
+      data: {
+        failedCheckInAttempts: newFailCount,
+        checkInLockedUntil: lockUntil,
+      },
+    });
+
+    if (shouldLock) {
+      throw new ApiError(
+        429,
+        "Too many failed attempts. Check-in is locked for 15 minutes."
+      );
+    }
+
+    throw new ApiError(400, "Invalid check-in code");
+  }
+
   const points = event.pointsValue || 0;
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -61,6 +110,8 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
         status: "CHECKED_IN",
         checkedInAt: new Date(),
         pointsAwarded: points,
+        failedCheckInAttempts: 0,
+        checkInLockedUntil: null,
       },
     });
 
