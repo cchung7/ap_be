@@ -4,11 +4,40 @@ import { prisma } from "@/src/lib/prisma";
 import { requireAuth } from "@/src/lib/auth";
 import { ApiError } from "@/src/lib/apiError";
 
-function getUtcDayStart() {
-  const now = new Date();
-  const dayStart = new Date(now);
-  dayStart.setUTCHours(0, 0, 0, 0);
-  return dayStart;
+function getChicagoDateKey(input: Date | string | number) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(input));
+}
+
+function getChicagoNowHHMM() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+
+  return `${hour}:${minute}`;
+}
+
+function isUpcomingOrToday(eventDate?: Date | null, startTime?: string | null) {
+  if (!eventDate) return false;
+
+  const todayKey = getChicagoDateKey(new Date());
+  const eventKey = getChicagoDateKey(eventDate);
+  const nowHHMM = getChicagoNowHHMM();
+
+  if (eventKey > todayKey) return true;
+  if (eventKey < todayKey) return false;
+
+  return (startTime || "00:00") >= nowHHMM;
 }
 
 export const GET = withApiHandler(async () => {
@@ -35,8 +64,6 @@ export const GET = withApiHandler(async () => {
   if (!me) {
     throw new ApiError(404, "User not found");
   }
-
-  const utcDayStart = getUtcDayStart();
 
   const [activities, attendances, totalEventsAttended, rankedMembers] =
     await Promise.all([
@@ -103,11 +130,9 @@ export const GET = withApiHandler(async () => {
     ]);
 
   const upcomingAttendances = attendances
-    .filter((attendance) => {
-      const eventDate = attendance.event?.date;
-      if (!eventDate) return false;
-      return new Date(eventDate) >= utcDayStart;
-    })
+    .filter((attendance) =>
+      isUpcomingOrToday(attendance.event?.date, attendance.event?.startTime)
+    )
     .sort((a, b) => {
       const aTime = new Date(a.event?.date || 0).getTime();
       const bTime = new Date(b.event?.date || 0).getTime();
@@ -131,7 +156,6 @@ export const GET = withApiHandler(async () => {
   }));
 
   const leaderboardRankIndex = rankedMembers.findIndex((member) => member.id === me.id);
-
   const leaderboardRank = leaderboardRankIndex >= 0 ? leaderboardRankIndex + 1 : null;
 
   const leaderboardTopFivePreview = rankedMembers.slice(0, 5).map((member, index) => ({

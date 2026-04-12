@@ -83,11 +83,30 @@ export const GET = withApiHandler(async () => {
     }),
   ]);
 
-  const memberRows = users.map((user) => {
-    const checkedInAttendances = user.attendances.filter(
-      (attendance) => attendance.status === "CHECKED_IN"
-    );
+  const userIds = users.map((user) => user.id);
 
+  const checkedInAttendances = userIds.length
+    ? await prisma.eventAttendance.findMany({
+        where: {
+          userId: { in: userIds },
+          status: "CHECKED_IN",
+        },
+        select: {
+          userId: true,
+        },
+      })
+    : [];
+
+  const checkedInCountByUser = new Map<string, number>();
+
+  for (const attendance of checkedInAttendances) {
+    checkedInCountByUser.set(
+      attendance.userId,
+      (checkedInCountByUser.get(attendance.userId) || 0) + 1
+    );
+  }
+
+  const memberRows = users.map((user) => {
     return {
       id: user.id,
       name: user.name,
@@ -99,7 +118,7 @@ export const GET = withApiHandler(async () => {
       major: user.major ?? "",
       profileImageUrl: user.profileImageUrl ?? "",
       pointsTotal: user.pointsTotal ?? 0,
-      eventsAttendedCount: checkedInAttendances.length,
+      eventsAttendedCount: checkedInCountByUser.get(user.id) || 0,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       attendancePreview: user.attendances.map((attendance) => ({

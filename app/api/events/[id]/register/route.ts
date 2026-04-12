@@ -1,4 +1,3 @@
-// D:\ap_be\app\api\events\[id]\register\route.ts
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
@@ -16,7 +15,9 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
     select: { status: true, name: true, email: true },
   });
 
-  if (!user) throw new ApiError(401, "Authorization Failed!");
+  if (!user) {
+    throw new ApiError(401, "Authorization Failed!");
+  }
 
   if (user.status === "PENDING") {
     throw new ApiError(403, "Account pending approval");
@@ -30,8 +31,19 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
     throw new ApiError(403, "Access denied");
   }
 
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (!event) throw new ApiError(404, "Event not found");
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: {
+      id: true,
+      title: true,
+      capacity: true,
+      totalRegistered: true,
+    },
+  });
+
+  if (!event) {
+    throw new ApiError(404, "Event not found");
+  }
 
   if (event.capacity > 0 && event.totalRegistered >= event.capacity) {
     throw new ApiError(400, "Event capacity is full");
@@ -39,13 +51,14 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
 
   const existing = await prisma.eventAttendance.findFirst({
     where: { userId: me.id, eventId },
+    select: { id: true },
   });
 
   if (existing) {
     throw new ApiError(400, "User already registered for this event");
   }
 
-  const result = await prisma.$transaction(async (tx: any) => {
+  const result = await prisma.$transaction(async (tx) => {
     const attendance = await tx.eventAttendance.create({
       data: {
         userId: me.id,
@@ -54,10 +67,22 @@ export const POST = withApiHandler(async (_req?: any, ctx?: any) => {
       },
     });
 
-    await tx.event.update({
-      where: { id: eventId },
-      data: { totalRegistered: { increment: 1 } },
+    const eventUpdate = await tx.event.updateMany({
+      where: {
+        id: eventId,
+        OR: [
+          { capacity: 0 },
+          { totalRegistered: { lt: event.capacity } },
+        ],
+      },
+      data: {
+        totalRegistered: { increment: 1 },
+      },
     });
+
+    if (eventUpdate.count !== 1) {
+      throw new ApiError(400, "Event capacity is full");
+    }
 
     await tx.recentActivity.create({
       data: {

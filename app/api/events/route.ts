@@ -1,34 +1,83 @@
-// D:\ap_be\app\api\events\route.ts
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
 import { optionalAuth } from "@/src/lib/auth";
 
-function getUtcDayWindow() {
-  const now = new Date();
+type EventStatusFilter = "TODAY" | "UPCOMING" | "PAST";
+type EventCurrentStatus = "UPCOMING" | "TODAY" | "PAST";
+type AttendanceStatus = "REGISTERED" | "CHECKED_IN" | "CANCELED";
 
-  const startUTC = new Date(now);
-  startUTC.setUTCHours(0, 0, 0, 0);
-
-  const endUTC = new Date(now);
-  endUTC.setUTCHours(23, 59, 59, 999);
-
-  const tomorrowStartUTC = new Date(startUTC);
-  tomorrowStartUTC.setUTCDate(tomorrowStartUTC.getUTCDate() + 1);
-
-  return { startUTC, endUTC, tomorrowStartUTC };
+function getChicagoDateKey(input: Date | string | number) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(input));
 }
 
-function getNowUtcHHMM() {
-  const now = new Date();
-  const hh = String(now.getUTCHours()).padStart(2, "0");
-  const mm = String(now.getUTCMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+function getChicagoNowHHMM() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+
+  return `${hour}:${minute}`;
 }
 
-function combineDateAndTimeToIso(dateValue: Date, time: string) {
+function combineDateAndTimeToLocalDateTimeString(dateValue: Date, time: string) {
   const datePart = dateValue.toISOString().slice(0, 10);
-  return new Date(`${datePart}T${time}:00.000Z`).toISOString();
+  return `${datePart}T${time}:00`;
+}
+
+function getCurrentStatus(
+  dateValue: Date,
+  startTime: string,
+  endTime?: string | null
+): EventCurrentStatus {
+  const todayKey = getChicagoDateKey(new Date());
+  const eventKey = getChicagoDateKey(dateValue);
+  const nowHHMM = getChicagoNowHHMM();
+
+  if (eventKey > todayKey) return "UPCOMING";
+  if (eventKey < todayKey) return "PAST";
+
+  if (endTime && endTime < nowHHMM) return "PAST";
+
+  return "TODAY";
+}
+
+function matchesStatusFilter(
+  dateValue: Date,
+  startTime: string,
+  endTime: string,
+  status?: string
+) {
+  if (!status) return true;
+
+  const normalized = status.toUpperCase() as EventStatusFilter;
+  const todayKey = getChicagoDateKey(new Date());
+  const eventKey = getChicagoDateKey(dateValue);
+  const nowHHMM = getChicagoNowHHMM();
+
+  if (normalized === "TODAY") {
+    return eventKey === todayKey;
+  }
+
+  if (normalized === "UPCOMING") {
+    return eventKey > todayKey || (eventKey === todayKey && startTime >= nowHHMM);
+  }
+
+  if (normalized === "PAST") {
+    return eventKey < todayKey || (eventKey === todayKey && endTime < nowHHMM);
+  }
+
+  return true;
 }
 
 function toEventCardDto(
@@ -47,16 +96,21 @@ function toEventCardDto(
     createdAt: Date;
     updatedAt: Date;
   },
-  isRegistered: boolean,
   viewerAuthenticated: boolean,
-  currentStatus: "UPCOMING" | "TODAY" | "PAST"
+  attendance?: {
+    status?: AttendanceStatus;
+    checkedInAt?: Date | null;
+    pointsAwarded?: number;
+  } | null
 ) {
   return {
     id: e.id,
     title: e.title,
     category: e.category,
-    startsAt: combineDateAndTimeToIso(e.date, e.startTime),
-    endsAt: e.endTime ? combineDateAndTimeToIso(e.date, e.endTime) : undefined,
+    startsAt: combineDateAndTimeToLocalDateTimeString(e.date, e.startTime),
+    endsAt: e.endTime
+      ? combineDateAndTimeToLocalDateTimeString(e.date, e.endTime)
+      : undefined,
     location: e.location,
     capacity: e.capacity,
     description: e.description ?? "",
@@ -67,9 +121,12 @@ function toEventCardDto(
     endTime: e.endTime,
     createdAt: e.createdAt,
     updatedAt: e.updatedAt,
-    currentStatus,
-    isRegistered,
+    currentStatus: getCurrentStatus(e.date, e.startTime, e.endTime),
+    isRegistered: Boolean(attendance),
     viewerAuthenticated,
+    attendanceStatus: attendance?.status,
+    checkedInAt: attendance?.checkedInAt ?? undefined,
+    pointsAwarded: attendance?.pointsAwarded ?? undefined,
   };
 }
 
@@ -77,11 +134,10 @@ export const GET = withApiHandler(async (req?: any) => {
   const request = req as Request;
   const url = new URL(request.url);
 
-  const searchTerm = url.searchParams.get("searchTerm") || "";
-  const status = url.searchParams.get("status") || "";
+  const searchTerm = (url.searchParams.get("searchTerm") || "").trim();
+  const status = (url.searchParams.get("status") || "").trim();
   const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
   const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || "12")));
-  const skip = (page - 1) * limit;
 
   const and: any[] = [];
 
@@ -95,73 +151,64 @@ export const GET = withApiHandler(async (req?: any) => {
     });
   }
 
-  const { startUTC, endUTC, tomorrowStartUTC } = getUtcDayWindow();
-  const nowHHMM = getNowUtcHHMM();
-
-  if (status === "TODAY") {
-    and.push({ date: { gte: startUTC, lte: endUTC } });
-  } else if (status === "UPCOMING") {
-    and.push({
-      OR: [
-        { date: { gte: tomorrowStartUTC } },
-        {
-          AND: [
-            { date: { gte: startUTC, lte: endUTC } },
-            { startTime: { gte: nowHHMM } },
-          ],
-        },
-      ],
-    });
-  } else if (status === "PAST") {
-    and.push({ date: { lt: startUTC } });
-  }
-
   const where = and.length ? { AND: and } : {};
-
   const tokenUser = await optionalAuth();
 
-  const [events, total] = await Promise.all([
-    prisma.event.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: [{ date: "asc" }, { startTime: "asc" }],
-    }),
-    prisma.event.count({ where }),
-  ]);
+  const allEvents = await prisma.event.findMany({
+    where,
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
+  });
 
-  let registeredSet = new Set<string>();
+  let attendanceByEventId = new Map<
+    string,
+    {
+      status?: AttendanceStatus;
+      checkedInAt?: Date | null;
+      pointsAwarded?: number;
+    }
+  >();
 
-  if (tokenUser?.id && events.length) {
+  if (tokenUser?.id && allEvents.length) {
     const regs = await prisma.eventAttendance.findMany({
       where: {
         userId: tokenUser.id,
-        eventId: { in: events.map((e) => e.id) as any },
+        eventId: { in: allEvents.map((e) => e.id) as any },
       },
-      select: { eventId: true },
+      select: {
+        eventId: true,
+        status: true,
+        checkedInAt: true,
+        pointsAwarded: true,
+      },
     });
 
-    registeredSet = new Set(regs.map((r) => r.eventId.toString()));
+    attendanceByEventId = new Map(
+      regs.map((r) => [
+        String(r.eventId),
+        {
+          status: r.status as AttendanceStatus,
+          checkedInAt: r.checkedInAt,
+          pointsAwarded: r.pointsAwarded ?? 0,
+        },
+      ])
+    );
   }
 
-  const nowMs = Date.now();
+  const filteredEvents = allEvents.filter((event) =>
+    matchesStatusFilter(event.date, event.startTime, event.endTime, status)
+  );
 
-  const data = events.map((e) => {
-    const startsAtIso = combineDateAndTimeToIso(e.date, e.startTime);
-    const startsAtMs = new Date(startsAtIso).getTime();
+  const total = filteredEvents.length;
+  const skip = (page - 1) * limit;
+  const pagedEvents = filteredEvents.slice(skip, skip + limit);
 
-    let currentStatus: "UPCOMING" | "TODAY" | "PAST" = "UPCOMING";
-    if (Number.isFinite(startsAtMs) && startsAtMs > nowMs) currentStatus = "UPCOMING";
-    else if (e.date >= startUTC && e.date <= endUTC) currentStatus = "TODAY";
-    else currentStatus = "PAST";
-
-    return toEventCardDto(
-      e,
-      tokenUser?.id ? registeredSet.has(e.id.toString()) : false,
+  const data = pagedEvents.map((event) =>
+    toEventCardDto(
+      event,
       !!tokenUser?.id,
-      currentStatus
-    );
-  });
+      attendanceByEventId.get(String(event.id)) ?? null
+    )
+  );
 
   return sendResponse({
     statusCode: 200,

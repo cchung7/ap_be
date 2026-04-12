@@ -40,13 +40,9 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     throw new ApiError(400, "Password is incorrect");
   }
 
-  if (user.status === "PENDING") {
-    throw new ApiError(
-      403,
-      "Your account is pending approval before it can be used to sign in."
-    );
-  }
-
+  // PENDING users are allowed to log in.
+  // Their restrictions should be enforced at the feature/authorization layer
+  // (e.g. event registration, event check-in, membership list visibility).
   if (user.status === "SUSPENDED") {
     throw new ApiError(
       403,
@@ -64,9 +60,13 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   const res = sendResponse({
     statusCode: 200,
     success: true,
-    message: "Login successful",
+    message:
+      user.status === "PENDING"
+        ? "Login successful. Your account is pending approval."
+        : "Login successful",
     data: {
       role: user.role,
+      status: user.status,
     },
   });
 

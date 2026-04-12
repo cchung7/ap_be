@@ -26,14 +26,29 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
     throw new ApiError(401, "Authorization Failed!");
   }
 
-  if (user.status !== "ACTIVE") {
+  if (user.status === "PENDING") {
     throw new ApiError(403, "Account pending approval");
   }
 
-  const { code } = checkinSchema.parse(await request.json());
+  if (user.status === "SUSPENDED") {
+    throw new ApiError(403, "Account is inactive");
+  }
+
+  if (user.status !== "ACTIVE") {
+    throw new ApiError(403, "Access denied");
+  }
+
+  const parsed = checkinSchema.parse(await request.json());
+  const code = parsed.code.trim();
 
   const attendance = await prisma.eventAttendance.findFirst({
     where: { userId: me.id, eventId },
+    select: {
+      id: true,
+      status: true,
+      failedCheckInAttempts: true,
+      checkInLockedUntil: true,
+    },
   });
 
   if (!attendance) {
@@ -42,6 +57,10 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
 
   if (attendance.status === "CHECKED_IN") {
     throw new ApiError(400, "You are already checked in");
+  }
+
+  if (attendance.status !== "REGISTERED") {
+    throw new ApiError(400, "Attendance is not eligible for check-in");
   }
 
   if (
@@ -60,6 +79,13 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
 
   const event = await prisma.event.findUnique({
     where: { id: eventId },
+    select: {
+      id: true,
+      title: true,
+      pointsValue: true,
+      checkInCodeHash: true,
+      checkInCodeExpires: true,
+    },
   });
 
   if (!event) {
@@ -102,18 +128,29 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
   }
 
   const points = event.pointsValue || 0;
+  const checkedInAt = new Date();
 
   const updated = await prisma.$transaction(async (tx) => {
-    const updatedAttendance = await tx.eventAttendance.update({
-      where: { id: attendance.id },
+    const attendanceUpdate = await tx.eventAttendance.updateMany({
+      where: {
+        id: attendance.id,
+        status: "REGISTERED",
+      },
       data: {
         status: "CHECKED_IN",
-        checkedInAt: new Date(),
+        checkedInAt,
         pointsAwarded: points,
         failedCheckInAttempts: 0,
         checkInLockedUntil: null,
       },
     });
+
+    if (attendanceUpdate.count !== 1) {
+      throw new ApiError(
+        409,
+        "Attendance status changed. Please refresh and try again."
+      );
+    }
 
     await tx.user.update({
       where: { id: me.id },
@@ -130,7 +167,15 @@ export const POST = withApiHandler(async (req?: any, ctx?: any) => {
       },
     });
 
-    return updatedAttendance;
+    const refreshedAttendance = await tx.eventAttendance.findUnique({
+      where: { id: attendance.id },
+    });
+
+    if (!refreshedAttendance) {
+      throw new ApiError(500, "Failed to load updated attendance");
+    }
+
+    return refreshedAttendance;
   });
 
   return sendResponse({
