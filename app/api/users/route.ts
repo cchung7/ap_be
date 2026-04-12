@@ -9,8 +9,6 @@ export const GET = withApiHandler(async (req?: any) => {
   const request = req as Request;
   const url = new URL(request.url);
 
-  const statusParam = (url.searchParams.get("status") || "ACTIVE").toUpperCase();
-
   const pageParam = url.searchParams.get("page");
   const limitParam = url.searchParams.get("limit");
 
@@ -19,13 +17,14 @@ export const GET = withApiHandler(async (req?: any) => {
   const requestedLimit = Math.max(1, Math.min(200, Number(limitParam || "25")));
   const skip = (page - 1) * requestedLimit;
 
-  // Optional filters
   const searchTerm = (url.searchParams.get("searchTerm") || "").trim();
   const roleParam = (url.searchParams.get("role") || "").toUpperCase();
 
-  const and: any[] = [{ status: statusParam as any }];
+  const and: any[] = [
+    { status: "ACTIVE" as any },
+  ];
 
-  if (roleParam) {
+  if (roleParam === "ADMIN" || roleParam === "MEMBER") {
     and.push({ role: roleParam as any });
   }
 
@@ -40,7 +39,7 @@ export const GET = withApiHandler(async (req?: any) => {
     });
   }
 
-  const where = and.length ? { AND: and } : {};
+  const where = { AND: and };
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
@@ -83,7 +82,6 @@ export const GET = withApiHandler(async (req?: any) => {
     data: users,
   });
 
-  // Hard no-cache
   res.headers?.set?.(
     "Cache-Control",
     "no-store, no-cache, must-revalidate, proxy-revalidate"
