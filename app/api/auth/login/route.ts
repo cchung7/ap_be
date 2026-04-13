@@ -9,26 +9,54 @@ import { verifyPassword } from "@/src/lib/password";
 import { loginSchema } from "@/src/lib/zodSchemas";
 import { withCors, corsPreflight } from "@/src/lib/cors";
 import { setAuthCookie } from "@/src/lib/authCookies";
+import { normalizeEmail } from "@/src/lib/email";
 
 export const OPTIONS = (req: NextRequest) => corsPreflight(req);
+
+const AUTH_USER_SELECT = {
+  id: true,
+  email: true,
+  password: true,
+  role: true,
+  name: true,
+  status: true,
+} as const;
 
 export const POST = withApiHandler(async (req: NextRequest) => {
   const raw = await req.json();
   const { email, password } = loginSchema.parse(raw);
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
-  const user = await prisma.user.findUnique({
+  let user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    select: {
-      id: true,
-      email: true,
-      password: true,
-      role: true,
-      name: true,
-      status: true,
-    },
+    select: AUTH_USER_SELECT,
   });
+
+  let shouldRepairEmail = false;
+
+  if (!user) {
+    const caseInsensitiveMatches = await prisma.user.findMany({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
+      },
+      take: 2,
+      select: AUTH_USER_SELECT,
+    });
+
+    if (caseInsensitiveMatches.length > 1) {
+      throw new ApiError(
+        409,
+        "Multiple accounts match this email. Please contact an administrator."
+      );
+    }
+
+    user = caseInsensitiveMatches[0] ?? null;
+    shouldRepairEmail = Boolean(user && user.email !== normalizedEmail);
+  }
 
   if (!user) {
     throw new ApiError(404, "User not found");
@@ -48,6 +76,18 @@ export const POST = withApiHandler(async (req: NextRequest) => {
       403,
       "Account has been suspended. Please contact your administrator."
     );
+  }
+
+  if (shouldRepairEmail) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { email: normalizedEmail },
+    });
+
+    user = {
+      ...user,
+      email: normalizedEmail,
+    };
   }
 
   const token = generateToken({

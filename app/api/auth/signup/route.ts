@@ -9,6 +9,7 @@ import { ApiError } from "@/src/lib/apiError";
 import { generateToken } from "@/src/lib/jwt";
 import { withCors, corsPreflight } from "@/src/lib/cors";
 import { setAuthCookie } from "@/src/lib/authCookies";
+import { normalizeEmail } from "@/src/lib/email";
 
 export const OPTIONS = (req: NextRequest) => corsPreflight(req);
 
@@ -36,7 +37,7 @@ export const POST = withApiHandler(async (req?: any) => {
     profileImageUrl,
   } = signupSchema.parse(raw);
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
   const existing = await prisma.user.findUnique({
     where: { email: normalizedEmail },

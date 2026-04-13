@@ -5,12 +5,10 @@ import { requireAuth } from "@/src/lib/auth";
 import { ApiError } from "@/src/lib/apiError";
 import { hashPassword, verifyPassword } from "@/src/lib/password";
 import { updateProfileSchema } from "@/src/lib/zodSchemas";
+import { normalizeEmail } from "@/src/lib/email";
 
 function getAuthUserId(authUser: unknown) {
-  const candidate =
-    (authUser as any)?.userId ??
-    (authUser as any)?.id ??
-    null;
+  const candidate = (authUser as any)?.userId ?? (authUser as any)?.id ?? null;
 
   return candidate ? String(candidate) : "";
 }
@@ -121,9 +119,7 @@ export const PATCH = withApiHandler(async (req: Request) => {
   }
 
   const wantsPasswordChange = Boolean(
-    payload.currentPassword ||
-      payload.newPassword ||
-      payload.confirmNewPassword
+    payload.currentPassword || payload.newPassword || payload.confirmNewPassword
   );
 
   if (wantsPasswordChange) {
@@ -141,7 +137,7 @@ export const PATCH = withApiHandler(async (req: Request) => {
 
   const updateData: any = {
     name: payload.name.trim(),
-    email: payload.email.trim().toLowerCase(),
+    email: normalizeEmail(payload.email),
     academicYear: normalizeOptionalText(payload.academicYear),
     major: normalizeOptionalText(payload.major),
   };
