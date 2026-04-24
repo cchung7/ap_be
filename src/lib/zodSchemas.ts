@@ -5,6 +5,34 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+});
+
+export const passwordResetOtpSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "OTP must be a 6-digit code."),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().email(),
+    password: z.string().min(8, "Password must be at least 8 characters."),
+    confirmPassword: z.string().min(1, "Please confirm your password."),
+  })
+  .superRefine((data, ctx) => {
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Passwords do not match.",
+      });
+    }
+  });
+
 export const createEventSchema = z.object({
   title: z.string().min(1),
   category: z.enum([
