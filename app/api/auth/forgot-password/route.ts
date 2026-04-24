@@ -15,18 +15,47 @@ import {
   buildPasswordResetOtpEmailHtml,
   buildPasswordResetOtpEmailText,
 } from "@/src/lib/passwordResetEmail";
+import {
+  assertRateLimit,
+  getClientIp,
+  getNumberEnv,
+} from "@/src/lib/rateLimit";
 
 export const OPTIONS = (req: NextRequest) => corsPreflight(req);
 
 const GENERIC_MESSAGE =
   "If an account exists for that email, a password reset code has been sent.";
 
-const OTP_TTL_MS = 10 * 60 * 1000;
+function getPasswordResetRateLimitConfig() {
+  return {
+    windowMs: getNumberEnv(
+      "PASSWORD_RESET_RATE_LIMIT_WINDOW_MS",
+      60 * 60 * 1000
+    ),
+    maxRequests: getNumberEnv("PASSWORD_RESET_RATE_LIMIT_MAX_REQUESTS", 3),
+  };
+}
+
+function getOtpTtlMs() {
+  const ttlMinutes = getNumberEnv("PASSWORD_RESET_OTP_TTL_MINUTES", 15);
+  return ttlMinutes * 60 * 1000;
+}
 
 export const POST = withApiHandler(async (req: NextRequest) => {
   const raw = await req.json();
   const { email } = forgotPasswordSchema.parse(raw);
   const normalizedEmail = normalizeEmail(email);
+
+  const clientIp = getClientIp(req);
+  const rateLimitConfig = getPasswordResetRateLimitConfig();
+
+  assertRateLimit({
+    key: `password-reset-send:${clientIp}:${normalizedEmail}`,
+    limit: rateLimitConfig.maxRequests,
+    windowMs: rateLimitConfig.windowMs,
+    message:
+      "Too many password reset requests. Please wait before requesting another code.",
+  });
 
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
@@ -50,7 +79,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
 
   const otp = generateNumericOtp(6);
   const otpHash = hashPasswordResetOtp(user.email, otp);
-  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+  const expiresAt = new Date(Date.now() + getOtpTtlMs());
 
   await prisma.user.update({
     where: { id: user.id },
