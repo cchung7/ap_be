@@ -13,11 +13,17 @@ model User {
 
   pointsTotal     Int        @default(0)
 
+  passwordResetOtpHash       String?
+  passwordResetOtpExpiresAt  DateTime?
+  passwordResetOtpVerifiedAt DateTime?
+  passwordResetOtpAttempts   Int       @default(0)
+
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   attendances     EventAttendance[]
 
   @@index([status, pointsTotal, name])
+  @@index([passwordResetOtpExpiresAt])
   @@map("users")
 }
