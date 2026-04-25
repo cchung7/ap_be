@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { withApiHandler } from "@/src/lib/withApiHandler";
 import { sendResponse } from "@/src/lib/sendResponse";
 import { prisma } from "@/src/lib/prisma";
+import { ApiError } from "@/src/lib/apiError";
 import { withCors, corsPreflight } from "@/src/lib/cors";
 import { normalizeEmail } from "@/src/lib/email";
 import { forgotPasswordSchema } from "@/src/lib/zodSchemas";
@@ -22,9 +23,6 @@ import {
 } from "@/src/lib/rateLimit";
 
 export const OPTIONS = (req: NextRequest) => corsPreflight(req);
-
-const GENERIC_MESSAGE =
-  "If an account exists for that email, a password reset code has been sent.";
 
 function getPasswordResetRateLimitConfig() {
   return {
@@ -66,15 +64,15 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     },
   });
 
-  if (!user || user.status === "SUSPENDED") {
-    const res = sendResponse({
-      statusCode: 200,
-      success: true,
-      message: GENERIC_MESSAGE,
-      data: {},
-    });
+  if (!user) {
+    throw new ApiError(404, "No account was found with that email address.");
+  }
 
-    return withCors(req, res);
+  if (user.status === "SUSPENDED") {
+    throw new ApiError(
+      403,
+      "This account is suspended. Please contact an administrator."
+    );
   }
 
   const otp = generateNumericOtp(6);
@@ -101,7 +99,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   const res = sendResponse({
     statusCode: 200,
     success: true,
-    message: GENERIC_MESSAGE,
+    message: "A password reset code has been sent to your email.",
     data: {},
   });
 
